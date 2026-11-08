@@ -18,9 +18,13 @@ struct run {
   struct run *next;
 };
 
+#define NPHYS_PAGES ((PHYSTOP - KERNBASE) / PGSIZE)
+#define PA2IDX(pa) (((uint64)(pa) - KERNBASE) / PGSIZE)
+
 struct {
   struct spinlock lock;
   struct run *freelist;
+  uint16 ref[NPHYS_PAGES];
 } kmem;
 
 void
@@ -35,8 +39,10 @@ freerange(void *pa_start, void *pa_end)
 {
   char *p;
   p = (char *)PGROUNDUP((uint64)pa_start);
-  for (; p + PGSIZE <= (char *)pa_end; p += PGSIZE)
+  for (; p + PGSIZE <= (char *)pa_end; p += PGSIZE) {
+    kmem.ref[PA2IDX(p)] = 1;
     kfree(p);
+  }
 }
 
 // Free the page of physical memory pointed at by pa,
@@ -50,6 +56,17 @@ kfree(void *pa)
 
   if (((uint64)pa % PGSIZE) != 0 || (char *)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
+
+  acquire(&kmem.lock);
+  if (kmem.ref[PA2IDX(pa)] <= 0)
+    panic("kfree: ref <= 0");
+
+  kmem.ref[PA2IDX(pa)]--;
+  if (kmem.ref[PA2IDX(pa)] > 0) {
+    release(&kmem.lock);
+    return;
+  }
+  release(&kmem.lock);
 
   // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
@@ -72,11 +89,43 @@ kalloc(void)
 
   acquire(&kmem.lock);
   r = kmem.freelist;
-  if (r)
+  if (r) {
     kmem.freelist = r->next;
+    kmem.ref[PA2IDX(r)] = 1;
+  }
   release(&kmem.lock);
 
   if (r)
     memset((char *)r, 5, PGSIZE); // fill with junk
   return (void *)r;
+}
+
+// Increment reference count of a physical page.
+void
+kref_inc(void *pa)
+{
+  if (((uint64)pa % PGSIZE) != 0 || (char *)pa < end || (uint64)pa >= PHYSTOP)
+    panic("kref_inc");
+
+  acquire(&kmem.lock);
+  if (kmem.ref[PA2IDX(pa)] <= 0)
+    panic("kref_inc: ref <= 0");
+  kmem.ref[PA2IDX(pa)]++;
+  release(&kmem.lock);
+}
+
+// Get the current reference count of a physical page.
+int
+kref_get(void *pa)
+{
+  int cnt;
+
+  if (((uint64)pa % PGSIZE) != 0 || (char *)pa < end || (uint64)pa >= PHYSTOP)
+    panic("kref_get");
+
+  acquire(&kmem.lock);
+  cnt = kmem.ref[PA2IDX(pa)];
+  release(&kmem.lock);
+
+  return cnt;
 }
