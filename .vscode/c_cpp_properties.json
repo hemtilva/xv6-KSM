@@ -1,0 +1,23 @@
+{
+  "configurations": [
+    {
+      "name": "xv6-riscv",
+      "includePath": [
+        "${workspaceFolder}/kernel",
+        "${workspaceFolder}/user",
+        "${workspaceFolder}"
+      ],
+      "defines": [],
+      "compilerPath": "/usr/bin/riscv64-linux-gnu-gcc",
+      "cStandard": "gnu99",
+      "intelliSenseMode": "linux-gcc-riscv64",
+      "compilerArgs": [
+        "-ffreestanding",
+        "-nostdlib",
+        "-Wall",
+        "-Werror"
+      ]
+    }
+  ],
+  "version": 4
+}
