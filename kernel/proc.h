@@ -103,3 +103,5 @@ struct proc {
   char name[16];               // Process name (debugging)
   int ksm_enabled;             // KSM deduplication opt-in
 };
+
+extern struct proc proc[NPROC];

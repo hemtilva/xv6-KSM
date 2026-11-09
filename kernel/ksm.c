@@ -22,7 +22,7 @@ struct ksm_slot {
 
 static struct ksm_slot ksm_table[KSM_TABLE_SIZE];
 
-__attribute__((unused)) static void
+static void
 ksm_table_reset(void)
 {
   memset(ksm_table, 0, sizeof(ksm_table));
@@ -36,7 +36,7 @@ ksminit(void)
   ksm_table_reset();
 }
 
-__attribute__((unused)) static uint32
+static uint32
 page_hash(void *page)
 {
   uint32 hash = 2166136261u;
@@ -52,7 +52,7 @@ page_hash(void *page)
   return hash;
 }
 
-__attribute__((unused)) static uint64
+static uint64
 ksm_lookup_or_insert(uint32 hash, uint64 pa)
 {
   uint32 idx = hash % KSM_TABLE_SIZE;
@@ -79,6 +79,28 @@ ksm_lookup_or_insert(uint32 hash, uint64 pa)
   return 0;
 }
 
+static void
+ksm_scan_proc(struct proc *p)
+{
+  for (uint64 va = 0; va < p->sz; va += PGSIZE) {
+    pte_t *pte = walk(p->pagetable, va, 0);
+    if (!pte || !(*pte & PTE_V) || !(*pte & PTE_U))
+      continue;
+
+    uint64 pa = PTE2PA(*pte);
+
+    acquire(&ksm.lock);
+    ksm.stat.scanned++;
+    release(&ksm.lock);
+
+    uint32 hash = page_hash((void *)pa);
+    uint64 match_pa = ksm_lookup_or_insert(hash, pa);
+    if (match_pa != 0) {
+      // Duplicate found; merge will happen in Step 4B.
+    }
+  }
+}
+
 int
 ksm_get_stat(struct ksmstat *st)
 {
@@ -91,5 +113,28 @@ ksm_get_stat(struct ksmstat *st)
 int
 ksm_scan_pass(void)
 {
+  acquire(&ksm.lock);
+  ksm_table_reset();
+  release(&ksm.lock);
+
+  for (int i = 0; i < NPROC; i++) {
+    struct proc *p = &proc[i];
+
+    acquire(&p->lock);
+    if (p->state == UNUSED || !p->ksm_enabled) {
+      release(&p->lock);
+      continue;
+    }
+
+    // Skip processes active on another core to avoid multicore TLB races without shootdown.
+    if (p->state == RUNNING && p != myproc()) {
+      release(&p->lock);
+      continue;
+    }
+
+    ksm_scan_proc(p);
+    release(&p->lock);
+  }
+
   return 0;
 }
