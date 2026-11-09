@@ -104,6 +104,8 @@ extern uint64 sys_mkdir(void);
 extern uint64 sys_close(void);
 extern uint64 sys_sync(void);
 extern uint64 sys_ksmenable(void);
+extern uint64 sys_ksmscan(void);
+extern uint64 sys_ksminfo(void);
 
 // An array mapping syscall numbers from syscall.h
 // to the function that handles the system call.
@@ -132,6 +134,8 @@ static uint64 (*syscalls[])(void) = {
   [SYS_close]   = sys_close,
   [SYS_sync]    = sys_sync,
   [SYS_ksmenable] = sys_ksmenable,
+  [SYS_ksmscan]   = sys_ksmscan,
+  [SYS_ksminfo]   = sys_ksminfo,
   // clang-format on
 };
 

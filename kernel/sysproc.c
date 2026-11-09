@@ -6,6 +6,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "vm.h"
+#include "ksm.h"
 
 uint64
 sys_exit(void)
@@ -117,5 +118,24 @@ sys_ksmenable(void)
   int on;
   argint(0, &on);
   myproc()->ksm_enabled = on ? 1 : 0;
+  return 0;
+}
+
+uint64
+sys_ksmscan(void)
+{
+  return ksm_scan_pass();
+}
+
+uint64
+sys_ksminfo(void)
+{
+  uint64 st_addr;
+  argaddr(0, &st_addr);
+  struct ksmstat st;
+  if (ksm_get_stat(&st) < 0)
+    return -1;
+  if (copyout(myproc()->pagetable, myproc()->sz, st_addr, (char *)&st, sizeof(st)) < 0)
+    return -1;
   return 0;
 }

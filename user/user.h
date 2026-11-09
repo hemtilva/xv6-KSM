@@ -1,6 +1,7 @@
 #define SBRK_ERROR ((char *)-1)
 
 struct stat;
+struct ksmstat;
 
 // system calls
 int fork(void);
@@ -26,6 +27,8 @@ int pause(int);
 int uptime(void);
 int sync(void);
 int ksmenable(int);
+int ksmscan(void);
+int ksminfo(struct ksmstat *);
 
 // ulib.c
 int stat(const char *, struct stat *);

@@ -22,3 +22,5 @@
 #define SYS_close  21
 #define SYS_sync   22
 #define SYS_ksmenable 23
+#define SYS_ksmscan   24
+#define SYS_ksminfo   25
