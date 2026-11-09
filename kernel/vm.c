@@ -543,6 +543,7 @@ cowfault(pagetable_t pagetable, uint64 va)
   *pte = PA2PTE(mem) | flags;
 
   kfree((void *)pa);
+  ksm_cow_break();
 
   sfence_vma();
   return 0;

@@ -188,6 +188,7 @@ void            virtio_disk_intr(void);
 
 // ksm.c
 void            ksminit(void);
+void            ksm_cow_break(void);
 int             ksm_get_stat(struct ksmstat *);
 int             ksm_scan_pass(void);
 

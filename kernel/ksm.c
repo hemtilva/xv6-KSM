@@ -79,6 +79,24 @@ ksm_lookup_or_insert(uint32 hash, uint64 pa)
   return 0;
 }
 
+static int
+ksm_merge_page(pte_t *pte, uint64 old_pa, uint64 match_pa)
+{
+  uint flags = (PTE_FLAGS(*pte) & ~PTE_W) | PTE_COW;
+  *pte = PA2PTE(match_pa) | flags;
+  sfence_vma();
+
+  kref_inc((void *)match_pa);
+  kfree((void *)old_pa);
+
+  acquire(&ksm.lock);
+  ksm.stat.merged++;
+  ksm.stat.saved_pages++;
+  release(&ksm.lock);
+
+  return 0;
+}
+
 static void
 ksm_scan_proc(struct proc *p)
 {
@@ -87,7 +105,17 @@ ksm_scan_proc(struct proc *p)
     if (!pte || !(*pte & PTE_V) || !(*pte & PTE_U))
       continue;
 
+    // Only anonymous user data pages (writable or already COW) are eligible.
+    if (!(*pte & PTE_W) && !(*pte & PTE_COW))
+      continue;
+
     uint64 pa = PTE2PA(*pte);
+
+    // Revoke write permission before hashing to prevent concurrent write races.
+    if (*pte & PTE_W) {
+      *pte = (*pte & ~PTE_W) | PTE_COW;
+      sfence_vma();
+    }
 
     acquire(&ksm.lock);
     ksm.stat.scanned++;
@@ -96,9 +124,19 @@ ksm_scan_proc(struct proc *p)
     uint32 hash = page_hash((void *)pa);
     uint64 match_pa = ksm_lookup_or_insert(hash, pa);
     if (match_pa != 0) {
-      // Duplicate found; merge will happen in Step 4B.
+      ksm_merge_page(pte, pa, match_pa);
     }
   }
+}
+
+void
+ksm_cow_break(void)
+{
+  acquire(&ksm.lock);
+  ksm.stat.cow_breaks++;
+  if (ksm.stat.saved_pages > 0)
+    ksm.stat.saved_pages--;
+  release(&ksm.lock);
 }
 
 int
