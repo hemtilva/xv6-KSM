@@ -506,7 +506,6 @@ ismapped(pagetable_t pagetable, uint64 va)
   return 0;
 }
 
-// Handle a copy-on-write page fault.
 // Returns 0 on success, -1 on failure.
 int
 cowfault(pagetable_t pagetable, uint64 va)
@@ -534,7 +533,6 @@ cowfault(pagetable_t pagetable, uint64 va)
     return 0;
   }
 
-  // Otherwise allocate a new private physical page.
   char *mem = kalloc();
   if (mem == 0)
     return -1;
@@ -544,7 +542,6 @@ cowfault(pagetable_t pagetable, uint64 va)
   uint flags = (PTE_FLAGS(*pte) & ~PTE_COW) | PTE_W;
   *pte = PA2PTE(mem) | flags;
 
-  // Drop reference to the old shared physical page.
   kfree((void *)pa);
 
   sfence_vma();
