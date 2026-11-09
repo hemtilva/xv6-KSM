@@ -136,7 +136,7 @@ ksm_scan_proc(struct proc *p)
     if (pa == ksm_zero_pa)
       continue;
 
-    // Revoke write permission before inspection to prevent concurrent write races.
+    // Revoke write permission before inspection.
     if (*pte & PTE_W) {
       *pte = (*pte & ~PTE_W) | PTE_COW;
       sfence_vma();
@@ -146,7 +146,7 @@ ksm_scan_proc(struct proc *p)
     ksm.stat.scanned++;
     release(&ksm.lock);
 
-    // Fast path: map all-zero pages directly to the shared zero frame without hashing.
+    // Fast path: map all-zero pages directly.
     if (is_zero_page((void *)pa)) {
       ksm_merge_page(pte, pa, ksm_zero_pa);
       continue;
