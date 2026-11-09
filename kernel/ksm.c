@@ -7,21 +7,50 @@
 #include "defs.h"
 #include "ksm.h"
 
-// Global KSM state and statistics
 struct {
   struct spinlock lock;
   struct ksmstat stat;
 } ksm;
 
-// Initialize KSM subsystem
+#define KSM_TABLE_SIZE 1024
+
+struct ksm_slot {
+  uint32 hash;
+  uint64 pa;
+};
+
+static struct ksm_slot ksm_table[KSM_TABLE_SIZE];
+
+__attribute__((unused)) static void
+ksm_table_reset(void)
+{
+  memset(ksm_table, 0, sizeof(ksm_table));
+}
+
 void
 ksminit(void)
 {
   initlock(&ksm.lock, "ksm");
   memset(&ksm.stat, 0, sizeof(ksm.stat));
+  ksm_table_reset();
 }
 
-// Copy current KSM statistics into caller-provided struct
+__attribute__((unused)) static uint32
+page_hash(void *page)
+{
+  uint32 hash = 2166136261u;
+  uint64 *p = (uint64 *)page;
+
+  for (int i = 0; i < PGSIZE / sizeof(uint64); i++) {
+    uint64 word = p[i];
+    hash ^= (uint32)word;
+    hash *= 16777619u;
+    hash ^= (uint32)(word >> 32);
+    hash *= 16777619u;
+  }
+  return hash;
+}
+
 int
 ksm_get_stat(struct ksmstat *st)
 {
@@ -31,10 +60,8 @@ ksm_get_stat(struct ksmstat *st)
   return 0;
 }
 
-// Entry point for ksmscan syscall: execute a single scan pass
 int
 ksm_scan_pass(void)
 {
-  // Page scanning and deduplication logic will be implemented in Steps 3 and 4
   return 0;
 }
