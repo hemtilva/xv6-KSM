@@ -128,6 +128,38 @@ test_inter_process_merge(void)
   printf("OK\n");
 }
 
+// Test 3: Deduplicating all-zero pages into the dedicated zero page frame
+void
+test_zero_page_merge(void)
+{
+  printf("test_zero_page_merge: ");
+
+  struct ksmstat st_before, st_after;
+  ksminfo(&st_before);
+
+  char *zp = sbrk(4 * 4096);
+  memset(zp, 0, 4 * 4096);
+
+  ksmscan();
+
+  ksminfo(&st_after);
+  if (st_after.merged < st_before.merged + 4) {
+    printf("FAILED (zero pages not merged: before=%ld, after=%ld)\n",
+           st_before.merged, st_after.merged);
+    exit(1);
+  }
+
+  // Trigger COW breaks and verify data isolation
+  zp[0] = 'X';
+  zp[4096] = 'Y';
+  if (zp[0] != 'X' || zp[4096] != 'Y' || zp[4096 * 2] != 0) {
+    printf("FAILED (zero page COW isolation broken)\n");
+    exit(1);
+  }
+
+  printf("OK\n");
+}
+
 int
 main(void)
 {
@@ -140,6 +172,7 @@ main(void)
 
   test_intra_process_merge();
   test_inter_process_merge();
+  test_zero_page_merge();
 
   struct ksmstat st;
   ksminfo(&st);
