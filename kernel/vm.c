@@ -365,6 +365,17 @@ copyout(pagetable_t pagetable, uint64 psz, uint64 dstva, char *src, uint64 len)
     }
 
     pte = walk(pagetable, va0, 0);
+    if (pte == 0)
+      return -1;
+
+    // If this is a copy-on-write page, break sharing before writing.
+    if (*pte & PTE_COW) {
+      if (cowfault(pagetable, va0) != 0)
+        return -1;
+      pa0 = walkaddr(pagetable, va0);
+      pte = walk(pagetable, va0, 0);
+    }
+
     // forbid copyout over read-only user text pages.
     if ((*pte & PTE_W) == 0)
       return -1;
@@ -492,5 +503,50 @@ ismapped(pagetable_t pagetable, uint64 va)
   if (*pte & PTE_V) {
     return 1;
   }
+  return 0;
+}
+
+// Handle a copy-on-write page fault.
+// Returns 0 on success, -1 on failure.
+int
+cowfault(pagetable_t pagetable, uint64 va)
+{
+  if (va >= MAXVA)
+    return -1;
+
+  va = PGROUNDDOWN(va);
+  pte_t *pte = walk(pagetable, va, 0);
+  if (pte == 0)
+    return -1;
+  if ((*pte & PTE_V) == 0)
+    return -1;
+  if ((*pte & PTE_U) == 0)
+    return -1;
+  if ((*pte & PTE_COW) == 0)
+    return -1;
+
+  uint64 pa = PTE2PA(*pte);
+
+  // If this process is the sole owner, make it writable in place.
+  if (kref_get((void *)pa) == 1) {
+    *pte = (*pte & ~PTE_COW) | PTE_W;
+    sfence_vma();
+    return 0;
+  }
+
+  // Otherwise allocate a new private physical page.
+  char *mem = kalloc();
+  if (mem == 0)
+    return -1;
+
+  memmove(mem, (char *)pa, PGSIZE);
+
+  uint flags = (PTE_FLAGS(*pte) & ~PTE_COW) | PTE_W;
+  *pte = PA2PTE(mem) | flags;
+
+  // Drop reference to the old shared physical page.
+  kfree((void *)pa);
+
+  sfence_vma();
   return 0;
 }
