@@ -44,6 +44,17 @@ ksminit(void)
   memset((void *)ksm_zero_pa, 0, PGSIZE);
 }
 
+static int
+is_zero_page(void *page)
+{
+  uint64 *p = (uint64 *)page;
+  for (int i = 0; i < PGSIZE / sizeof(uint64); i++) {
+    if (p[i] != 0)
+      return 0;
+  }
+  return 1;
+}
+
 static uint32
 page_hash(void *page)
 {
@@ -122,8 +133,10 @@ ksm_scan_proc(struct proc *p)
       continue;
 
     uint64 pa = PTE2PA(*pte);
+    if (pa == ksm_zero_pa)
+      continue;
 
-    // Revoke write permission before hashing to prevent concurrent write races.
+    // Revoke write permission before inspection to prevent concurrent write races.
     if (*pte & PTE_W) {
       *pte = (*pte & ~PTE_W) | PTE_COW;
       sfence_vma();
@@ -132,6 +145,12 @@ ksm_scan_proc(struct proc *p)
     acquire(&ksm.lock);
     ksm.stat.scanned++;
     release(&ksm.lock);
+
+    // Fast path: map all-zero pages directly to the shared zero frame without hashing.
+    if (is_zero_page((void *)pa)) {
+      ksm_merge_page(pte, pa, ksm_zero_pa);
+      continue;
+    }
 
     uint32 hash = page_hash((void *)pa);
     uint64 match_pa = ksm_lookup_or_insert(hash, pa);
