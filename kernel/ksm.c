@@ -82,6 +82,10 @@ ksm_lookup_or_insert(uint32 hash, uint64 pa)
 static int
 ksm_merge_page(pte_t *pte, uint64 old_pa, uint64 match_pa)
 {
+  // Double-check: ensure contents remained identical before committing the merge.
+  if (memcmp((void *)old_pa, (void *)match_pa, PGSIZE) != 0)
+    return -1;
+
   uint flags = (PTE_FLAGS(*pte) & ~PTE_W) | PTE_COW;
   *pte = PA2PTE(match_pa) | flags;
   sfence_vma();

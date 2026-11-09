@@ -153,6 +153,7 @@ UPROGS=\
 	$U/_dorphan\
 	$U/_sync\
 	$U/_cowtest\
+	$U/_ksmtest\
 
 fs.img: mkfs/mkfs README.md $(UPROGS)
 	mkfs/mkfs fs.img README.md $(UPROGS)
