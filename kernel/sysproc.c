@@ -110,3 +110,12 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64
+sys_ksmenable(void)
+{
+  int on;
+  argint(0, &on);
+  myproc()->ksm_enabled = on ? 1 : 0;
+  return 0;
+}

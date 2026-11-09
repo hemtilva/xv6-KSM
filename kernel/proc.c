@@ -145,6 +145,7 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
+  p->ksm_enabled = 0;
 
   return p;
 }
@@ -167,6 +168,7 @@ freeproc(struct proc *p)
   p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
+  p->ksm_enabled = 0;
   p->state = UNUSED;
 }
 
@@ -288,6 +290,7 @@ kfork(void)
   np->cwd = idup(p->cwd);
 
   safestrcpy(np->name, p->name, sizeof(p->name));
+  np->ksm_enabled = p->ksm_enabled;
 
   pid = np->pid;
 
