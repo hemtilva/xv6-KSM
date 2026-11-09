@@ -22,6 +22,8 @@ struct ksm_slot {
 
 static struct ksm_slot ksm_table[KSM_TABLE_SIZE];
 
+uint64 ksm_zero_pa;
+
 static void
 ksm_table_reset(void)
 {
@@ -34,6 +36,12 @@ ksminit(void)
   initlock(&ksm.lock, "ksm");
   memset(&ksm.stat, 0, sizeof(ksm.stat));
   ksm_table_reset();
+
+  // Allocate global zero page frame; pinned with initial ref=1 so it is never freed to freelist.
+  ksm_zero_pa = (uint64)kalloc();
+  if (ksm_zero_pa == 0)
+    panic("ksminit: kalloc zero page");
+  memset((void *)ksm_zero_pa, 0, PGSIZE);
 }
 
 static uint32

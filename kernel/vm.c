@@ -526,8 +526,8 @@ cowfault(pagetable_t pagetable, uint64 va)
 
   uint64 pa = PTE2PA(*pte);
 
-  // If this process is the sole owner, make it writable in place.
-  if (kref_get((void *)pa) == 1) {
+  // If this process is the sole owner, make it writable in place (never in-place for global zero page).
+  if (pa != ksm_zero_pa && kref_get((void *)pa) == 1) {
     *pte = (*pte & ~PTE_COW) | PTE_W;
     sfence_vma();
     return 0;
