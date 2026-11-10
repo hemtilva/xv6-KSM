@@ -156,6 +156,7 @@ UPROGS=\
 	$U/_ksmtest\
 	$U/_ksmd\
 	$U/_ksmbench\
+	$U/_ksmreal\
 
 fs.img: mkfs/mkfs README.md $(UPROGS)
 	mkfs/mkfs fs.img README.md $(UPROGS)
